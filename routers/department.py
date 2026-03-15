@@ -4,7 +4,7 @@ from schemas import Department as DepartmentSchema, DepartmentCreate
 from sqlalchemy import select
 from db_depends import get_async_db
 from models.employee import Employee as EmployeeModel
-from crud import check_department, collect_sub_departments, create_department, check_parent, has_cycle, check_name
+from crud import check_department, collect_sub_departments, create_department, check_parent, has_cycle, check_name, delete_department
 
 router = APIRouter(prefix='/departments', tags=['departments'])
 
@@ -63,7 +63,19 @@ async def update_department(id: int, department: DepartmentCreate, db: AsyncSess
     await db.refresh(stmt)
     return stmt
 
-    
 
-
-
+@router.delete('/{id}', status_code=status.HTTP_204_NO_CONTENT)
+async def delete_department_endpoint(
+    id: int,
+    mode: str = Query(..., regex='^(cascade|reassign)$'),
+    reassign_to_department_id: int | None = None,
+    db: AsyncSession = Depends(get_async_db)
+):
+    """
+    Удаляет подразделение по id.
+    - mode=cascade: удаляет подразделение, его сотрудников и все дочерние подразделения.
+    - mode=reassign: удаляет подразделение, но сотрудников перемещает в другое подразделение.
+      В этом случае reassign_to_department_id обязателен.
+    """
+    await delete_department(id, mode, reassign_to_department_id, db)
+    return

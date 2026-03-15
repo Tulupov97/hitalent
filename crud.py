@@ -1,9 +1,10 @@
 from fastapi import Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, update
 from db_depends import get_async_db
 from models.department import Department as DepartmentModel
-from schemas import Department as DepartmentSchema, DepartmentCreate
+from schemas import DepartmentCreate
+from models.employee import Employee as EmployeeModel
 
 async def check_department(department_id : int, db: AsyncSession = Depends(get_async_db)):
     if not await db.scalar(select(DepartmentModel).where(DepartmentModel.id == department_id)):
@@ -62,9 +63,48 @@ async def has_cycle(id: int, target_parent_id: int, db: AsyncSession = Depends(g
             status_code=409,
             detail="Нельзя создать цикл в дереве"
         )
+        
+async def delete_department(
+    department_id: int,
+    mode: str,
+    reassign_to_department_id: int | None,
+    db: AsyncSession
+):
+    # Получаем подразделение
+    department = await check_department(department_id, db)
+    if not department:
+        raise HTTPException(status_code=404, detail="Подразделение не найдено")
+
+    if mode == "cascade":
+        await db.delete(department)
     
+    elif mode == "reassign":
+        if not reassign_to_department_id:
+            raise HTTPException(status_code=400, detail="reassign_to_department_id обязателен при mode=reassign")
+        
+        reassign_to = await check_department(reassign_to_department_id, db)
+        if not reassign_to:
+            raise HTTPException(status_code=404, detail="Целевое подразделение для перевода не найдено")
+
+        # Переназначаем сотрудников
+        await db.execute(
+            update(EmployeeModel)
+            .where(EmployeeModel.department_id == department_id)
+            .values(department_id=reassign_to_department_id)
+        )
+        
+        await db.delete(department)
+    
+    else:
+        raise HTTPException(status_code=400, detail="Неверный режим: допустимы только 'cascade' или 'reassign'")
+
+    await db.commit()
+
 async def check_name(department: DepartmentCreate, db: AsyncSession = Depends(get_async_db)):
-     # Проверяем уникальность имени в пределах одного родителя
+    """
+    Проверяет, что в пределах одного родителя нет подразделения с таким же именем.
+    """
+    if department.parent_id is not None:
         existing = await db.scalar(
             select(DepartmentModel)
             .where(DepartmentModel.parent_id == department.parent_id)
