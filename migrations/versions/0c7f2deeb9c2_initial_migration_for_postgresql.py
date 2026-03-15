@@ -1,8 +1,8 @@
 """Initial migration for PostgreSQL
 
-Revision ID: 66f127ccee34
+Revision ID: 0c7f2deeb9c2
 Revises: 
-Create Date: 2026-03-12 23:59:27.135185
+Create Date: 2026-03-14 15:40:59.543126
 
 """
 from typing import Sequence, Union
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = '66f127ccee34'
+revision: str = '0c7f2deeb9c2'
 down_revision: Union[str, Sequence[str], None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -26,7 +26,7 @@ def upgrade() -> None:
     sa.Column('name', sa.String(length=200), nullable=False),
     sa.Column('parent_id', sa.Integer(), nullable=True),
     sa.Column('created_at', sa.DateTime(), nullable=False),
-    sa.ForeignKeyConstraint(['parent_id'], ['departments.id'], ),
+    sa.ForeignKeyConstraint(['parent_id'], ['departments.id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('name')
     )
@@ -35,7 +35,7 @@ def upgrade() -> None:
     sa.Column('department_id', sa.Integer(), nullable=False),
     sa.Column('full_name', sa.String(length=200), nullable=False),
     sa.Column('position', sa.String(length=200), nullable=False),
-    sa.Column('hired_at', sa.DateTime(), nullable=True),
+    sa.Column('hired_at', sa.Date(), nullable=True),
     sa.Column('created_at', sa.DateTime(), nullable=False),
     sa.ForeignKeyConstraint(['department_id'], ['departments.id'], ),
     sa.PrimaryKeyConstraint('id')

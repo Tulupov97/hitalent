@@ -1,8 +1,15 @@
-from fastapi import Depends
+from fastapi import Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from db_depends import get_async_db
 from models.department import Department as DepartmentModel
+from schemas import Department as DepartmentSchema, DepartmentCreate
+
+async def check_department(department_id : int, db: AsyncSession = Depends(get_async_db)):
+    if not await db.scalar(select(DepartmentModel).where(DepartmentModel.id == department_id)):
+        raise HTTPException(status_code=404, detail="Подразделение не найдено")
+    return await db.scalar(select(DepartmentModel).where(DepartmentModel.id == department_id))
+    
 
 async def collect_sub_departments(parent_id: int, current_depth: int, db: AsyncSession = Depends(get_async_db)):
 
@@ -17,3 +24,51 @@ async def collect_sub_departments(parent_id: int, current_depth: int, db: AsyncS
                 all_sub_deps.extend(children)
         
         return all_sub_deps
+
+async def create_department(department: DepartmentCreate, db: AsyncSession = Depends(get_async_db)) -> DepartmentModel:
+    """
+    Создаёт новое подразделение.
+    """
+    if department.parent_id is not None:
+        await check_parent(department.parent_id, db)
+        await check_name(department, db)
+        
+    db_department = DepartmentModel(**department.model_dump())
+    db.add(db_department)
+    await db.commit()
+    return db_department
+
+async def check_parent(department_id: int, db: AsyncSession = Depends(get_async_db)):
+        if not await db.scalar(select(DepartmentModel).where(DepartmentModel.id == department_id)):
+                raise HTTPException(status_code=404, detail="Подразделение-родитель не найдено")
+        
+
+async def has_cycle(id: int, target_parent_id: int, db: AsyncSession = Depends(get_async_db)) -> None:
+    """
+    Проверяет, приведёт ли установка parent_id=target_parent_id к циклу в дереве.
+    """
+
+    ancestors = set()
+    current_id = target_parent_id
+    while current_id is not None:
+        ancestors.add(current_id)
+        parent_id = await db.scalar(
+            select(DepartmentModel.parent_id).where(DepartmentModel.id == current_id)
+        )
+        current_id = parent_id
+
+    if id in ancestors:
+         raise HTTPException(
+            status_code=409,
+            detail="Нельзя создать цикл в дереве"
+        )
+    
+async def check_name(department: DepartmentCreate, db: AsyncSession = Depends(get_async_db)):
+     # Проверяем уникальность имени в пределах одного родителя
+        existing = await db.scalar(
+            select(DepartmentModel)
+            .where(DepartmentModel.parent_id == department.parent_id)
+            .where(DepartmentModel.name == department.name)
+        )
+        if existing:
+            raise HTTPException(status_code=400, detail="Подразделение с таким именем уже существует в указанном родителе")

@@ -1,6 +1,7 @@
 from pydantic import BaseModel, Field, ConfigDict
 from datetime import datetime, date
 
+
 class DepartmentCreate(BaseModel):
     name: str = Field(..., min_length=1, max_length=200, description="Название подразделения")
     parent_id: int | None = Field(default=None, description="ID родительского подразделения")
