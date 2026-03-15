@@ -6,13 +6,15 @@ from models.department import Department as DepartmentModel
 from schemas import DepartmentCreate
 from models.employee import Employee as EmployeeModel
 
-async def check_department(department_id : int, db: AsyncSession = Depends(get_async_db)):
+async def check_department(department_id : int, db: AsyncSession = Depends(get_async_db)) -> DepartmentModel | None:
+    """Проверка существоания департамента"""
     if not await db.scalar(select(DepartmentModel).where(DepartmentModel.id == department_id)):
         raise HTTPException(status_code=404, detail="Подразделение не найдено")
     return await db.scalar(select(DepartmentModel).where(DepartmentModel.id == department_id))
     
 
-async def collect_sub_departments(parent_id: int, current_depth: int, db: AsyncSession = Depends(get_async_db)):
+async def collect_sub_departments(parent_id: int, current_depth: int, db: AsyncSession = Depends(get_async_db)) -> list[DepartmentModel]:
+        """Функция сбора подразделений-наследников для patch эндпоинта"""
 
         result = await db.scalars(select(DepartmentModel).where(DepartmentModel.parent_id == parent_id))
         sub_deps = result.all()
@@ -39,7 +41,7 @@ async def create_department(department: DepartmentCreate, db: AsyncSession = Dep
     await db.commit()
     return db_department
 
-async def check_parent(department_id: int, db: AsyncSession = Depends(get_async_db)):
+async def check_parent(department_id: int, db: AsyncSession = Depends(get_async_db)) -> None:
         if not await db.scalar(select(DepartmentModel).where(DepartmentModel.id == department_id)):
                 raise HTTPException(status_code=404, detail="Подразделение-родитель не найдено")
         
@@ -100,7 +102,7 @@ async def delete_department(
 
     await db.commit()
 
-async def check_name(department: DepartmentCreate, db: AsyncSession = Depends(get_async_db)):
+async def check_name(department: DepartmentCreate, db: AsyncSession = Depends(get_async_db)) -> None:
     """
     Проверяет, что в пределах одного родителя нет подразделения с таким же именем.
     """

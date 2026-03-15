@@ -45,7 +45,7 @@ async def get_department(id: int,
 
 @router.patch('/{id}',response_model=DepartmentCreate, status_code=status.HTTP_200_OK)
 async def update_department(id: int, department: DepartmentCreate, db: AsyncSession = Depends(get_async_db)):
-    stmt = await check_department(id, db)
+    department_db = await check_department(id, db)
 
     if department.parent_id == id:
         raise HTTPException(
@@ -57,17 +57,17 @@ async def update_department(id: int, department: DepartmentCreate, db: AsyncSess
         await check_name(department, db)
         await has_cycle(id,department.parent_id,db)
 
-    stmt.parent_id = department.parent_id
-    stmt.name = department.name
+    department_db.parent_id = department.parent_id
+    department_db.name = department.name
     await db.commit()
-    await db.refresh(stmt)
-    return stmt
+    await db.refresh(department_db)
+    return department_db
 
 
 @router.delete('/{id}', status_code=status.HTTP_204_NO_CONTENT)
 async def delete_department_endpoint(
     id: int,
-    mode: str = Query(..., regex='^(cascade|reassign)$'),
+    mode: str = Query(..., pattern='^(cascade|reassign)$'),
     reassign_to_department_id: int | None = None,
     db: AsyncSession = Depends(get_async_db)
 ):
